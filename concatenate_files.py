@@ -56,7 +56,7 @@ def read_directory(directory):
 
     return data
 
-def print_meson_file( subDataFrame, in_dir, out_dir, Ng = 16 ):
+def print_meson_file( sub_dataFrame, in_dir, out_dir, Ng = 16 ):
     """
         Concat the contents of meson files and store them to disk, there will be
         16 output files, one for each gamma matrix
@@ -78,54 +78,124 @@ def print_meson_file( subDataFrame, in_dir, out_dir, Ng = 16 ):
     """
 
     # Get the first row of the data frame
-    row1 = subDataFrame.iloc[0]
+    row1 = sub_dataFrame.iloc[0]
 
     # Load the data corresponding to get the NT of the file
     file_values = np.loadtxt( "{}/{}".format( in_dir, row1["file"]) )
     nt = file_values.shape[0]
-    pMax = int( file_values.shape[1] / ( 2 * Ng ) )
+    numPsquare = int( file_values.shape[1] / ( 2 * Ng ) )
 
     # Create a folder to hold the data in an organised way
-    foldName = "{}/{}".format( row1["particle"], row1["flavour"] )
+    folder_partflav = "{}/{}".format( row1["particle"], row1["flavour"] )
 
     # Generate string formats to be filled in the generation of data
-    fileFormat = "{}.{}.g{}.{}.p{}".format(
+    format_file = "{}.{}.g{}.{}.p{}".format(
                 row1["run"], row1["particle"], "{}", row1["flavour"], "{}" )
-    saveGamma = "{}/{}/g_{}/".format( out_dir, foldName, "{}" )
-    saveMom = "{}/pSq_{}".format( "{}", "{}" )
+    format_gamma = "{}/{}/g_{}".format( out_dir, folder_partflav, "{}" )
+    format_momenta = "{}/psquare_{}".format( "{}", "{}" )
 
     # Buffer to save the data to, consisting of nt + 16 * ( Re + Im )
-    buffData = np.zeros( ( nt, 1 + pMax * 2 * Ng ) )
-    buffData[:, 0] = range(nt)
+    buff_data = np.zeros( ( nt, 1 + numPsquare * 2 * Ng ) )
+    buff_data[:, 0] = range(nt)
 
-    saveFiles = []
+    files_to_save = []
     for ig in range( Ng ):
-        fGamma = saveGamma.format( ig )
-        if not os.path.exists( fGamma ):
-            os.makedirs( fGamma )
-        for ip in range( pMax ):
-            fMom = saveMom.format( fGamma, ip )
-            if not os.path.exists( fMom ):
-                os.makedirs( fMom )
+        path_gamma = format_gamma.format( ig )
+        if not os.path.exists( path_gamma ):
+            os.makedirs( path_gamma )
+        for ip in range( numPsquare ):
+            path_momenta = format_momenta.format( path_gamma, ip )
+            if not os.path.exists( path_momenta ):
+                os.makedirs( path_momenta )
             # Create the file inside the gamma/momenta directory
-            pathFile = "{}/{}".format( fMom, fileFormat.format( ig, ip ) )
-            saveFiles.append( open( pathFile, "w" ) )
+            path_file = "{}/{}".format( path_momenta, format_file.format( ig, ip ) )
+            files_to_save.append( open( path_file, "w" ) )
 
-    for i, row_db in subDataFrame.iterrows():
+    for index, row_db in sub_dataFrame.iterrows():
 
         # Load the data corresponding to each config and source into the buffer
-        buffData[:, 1:] = np.loadtxt( "{}/{}".format( in_dir, row_db["file"] ) )
+        buff_data[:, 1:] = np.loadtxt( "{}/{}".format( in_dir, row_db["file"] ) )
 
         # Append to the correspoding file with coordinates ( ig, ip )
         for ig in range( Ng ):
-            for ip in range( pMax ):
-                indexReal = 2 * ( ig * pMax + ip ) + 1
-                indexImag = 2 * ( ig * pMax + ip ) + 2
-                np.savetxt( saveFiles[ig*pMax + ip],
-                            buffData[:, [0, indexReal, indexImag] ],
+            for ip in range( numPsquare ):
+                index_real = 2 * ( ig * numPsquare + ip ) + 1
+                index_imag = 2 * ( ig * numPsquare + ip ) + 2
+                np.savetxt( files_to_save[ig*numPsquare + ip],
+                            buff_data[:, [0, index_real, index_imag] ],
                             fmt="%d\t%.12e\t%.12e" )
 
-    for files in saveFiles:
+    for files in files_to_save:
+        files.close()
+
+def print_baryon_file( sub_dataFrame, in_dir, out_dir ):
+    """
+        Concat the contents of meson files and store them to disk, there will be
+        16 output files, one for each gamma matrix
+
+        Parameters
+        ----------
+        subDataFrame : pandas.DataFrame
+            dataframe produced by read_directory filtered to be for one particle
+            and flavour combination
+
+        in_dir : string
+            The directory the files to be read are in
+
+        out_dir : string
+            The directory to store the concat results
+
+        Ng      : Integer ( optional = 16 )
+            Total number of gamma structures calculated.
+    """
+
+    # Get the first row of the data frame
+    row1 = sub_dataFrame.iloc[0]
+
+    # Load the data corresponding to get the NT of the file
+    file_values = np.loadtxt( "{}/{}".format( in_dir, row1["file"]) )
+    nt = file_values.shape[0]
+
+    # Number of momenta in the calculation
+    numPsquare = int( file_values.shape[1] / ( 2 ) )
+
+    # Create a folder to hold the data in an organised way
+    folder_partflav = "{}/{}".format( row1["particle"], row1["flavour"] )
+
+    # Generate string formats to be filled in the generation of data
+    format_file = "{}.{}.{}.{}.p{}".format(
+            row1["run"], row1["particle"], row1["particle"], row1["flavour"], "{}" )
+    format_momenta = "{}/baryon/{}/psquare_{}".format( out_dir, folder_partflav, "{}" )
+
+    # Buffer to save the data to, consisting of nt + 16 * ( Re + Im )
+    buff_data = np.zeros( ( nt, 1 + numPsquare * 2  ) )
+    buff_data[:, 0] = range(nt)
+    
+    # Get all the files that are going to be analysed
+    files_to_save = []
+    for ip in range( numPsquare ):
+        # Path to a given momenta
+        path_momenta = format_momenta.format( ip )
+        if not os.path.exists( path_momenta ):
+            os.makedirs( path_momenta )
+        # Create the file inside the momenta directory
+        path_file = "{}/{}".format( path_momenta, format_file.format( ip ) )
+        files_to_save.append( open( path_file, "w" ) )
+
+    for index, row_db in sub_dataFrame.iterrows():
+
+        # Load the data corresponding to each config and source into buffer
+        buff_data[:, 1:] = np.loadtxt( "{}/{}".format( in_dir, row_db["file"] ) )
+
+        # Append to the corresponding file with coordinate ip
+        for ip in range( numPsquare ):
+            index_real = 2 * ip + 1
+            index_imag = 2 * ip + 2
+            np.savetxt( files_to_save[ip],
+                        buff_data[:, [0, index_real, index_imag] ],
+                        fmt="%d\t%.12e\t%.12e" )
+
+    for files in files_to_save:
         files.close()
 
 def main(args):
@@ -153,8 +223,8 @@ def main(args):
         Ng = args[3]
     else:
         Ng = 16
-
-    print( in_dir, out_dir, Ng )
+    
+    # Read the data inside the input directory
     dataFrame = read_directory( in_dir )
 
     if len( dataFrame["run"].cat.categories ) > 1:
@@ -163,19 +233,21 @@ def main(args):
 
     # Loop over different flavour combinations
     for flavour in dataFrame["flavour"].cat.categories:
-        flavDataFrame = dataFrame[ dataFrame["flavour"] == flavour ]
+        flavor_dataFrame = dataFrame[ dataFrame["flavour"] == flavour ]
 
         # Loop over different particles
-        for particle in flavDataFrame["particle"].cat.categories:
-            partFlavDataFrame = flavDataFrame[
-                                    flavDataFrame["particle"] == particle]
+        for particle in flavor_dataFrame["particle"].cat.categories:
+            particle_dataFrame = flavor_dataFrame[
+                                flavor_dataFrame["particle"] == particle]
 
             # Skip empty selections
-            if ( len( partFlavDataFrame ) ) == 0:
+            if ( len( particle_dataFrame ) ) == 0:
                 continue
 
             if particle == "meson":
-                print_meson_file( partFlavDataFrame, in_dir, out_dir, Ng )
+                print_meson_file( particle_dataFrame, in_dir, out_dir, Ng )
+            else:
+                print_baryon_file( particle_dataFrame, in_dir, out_dir )
 
 if __name__ == '__main__':
     try:
